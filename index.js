@@ -130,6 +130,31 @@ const parseProcessFields = ({processId, parentProcessId, userId, cpuUsage, memor
 
 	// Derive process name: prefer basename of path, fallback to command name
 	const derivedProcessName = resolvedExecutablePath ? path.basename(resolvedExecutablePath) : (commandName || '');
+	const normalizedCommandLine = command || '';
+
+	let commandArguments = '';
+	if (normalizedCommandLine) {
+		const tokenCandidates = [];
+		if (resolvedExecutablePath) {
+			tokenCandidates.push(resolvedExecutablePath, `"${resolvedExecutablePath}"`);
+		}
+
+		if (derivedProcessName) {
+			tokenCandidates.push(derivedProcessName, `"${derivedProcessName}"`);
+		}
+
+		for (const commandToken of tokenCandidates) {
+			if (normalizedCommandLine === commandToken) {
+				commandArguments = '';
+				break;
+			}
+
+			if (normalizedCommandLine.startsWith(`${commandToken} `)) {
+				commandArguments = normalizedCommandLine.slice(commandToken.length + 1);
+				break;
+			}
+		}
+	}
 
 	return {
 		pid: parsedProcessId,
@@ -140,7 +165,8 @@ const parseProcessFields = ({processId, parentProcessId, userId, cpuUsage, memor
 		name: derivedProcessName,
 		path: resolvedExecutablePath,
 		startTime: makeStartTime(startTimeString),
-		cmd: command || '',
+		cmd: normalizedCommandLine,
+		args: commandArguments,
 	};
 };
 
