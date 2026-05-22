@@ -116,6 +116,39 @@ const parseIntegerOrUndefined = fieldValue => {
 	return Number.isNaN(parsedValue) ? undefined : parsedValue;
 };
 
+const extractProcessArguments = ({command, executablePath, commandName}) => {
+	if (!command) {
+		return '';
+	}
+
+	if (executablePath) {
+		const quotedExecutablePath = `"${executablePath}"`;
+		if (command.startsWith(`${quotedExecutablePath} `)) {
+			return command.slice(quotedExecutablePath.length + 1).trim();
+		}
+
+		if (command === quotedExecutablePath || command === executablePath) {
+			return '';
+		}
+
+		if (command.startsWith(`${executablePath} `)) {
+			return command.slice(executablePath.length + 1).trim();
+		}
+	}
+
+	if (commandName && command.startsWith(`${commandName} `)) {
+		return command.slice(commandName.length + 1).trim();
+	}
+
+	const quotedCommandMatch = command.match(/^"[^"]+"\s*(.*)$/);
+	if (quotedCommandMatch) {
+		return quotedCommandMatch[1].trim();
+	}
+
+	const firstSpaceIndex = command.indexOf(' ');
+	return firstSpaceIndex === -1 ? '' : command.slice(firstSpaceIndex + 1).trim();
+};
+
 // Unified field parser
 const parseProcessFields = ({processId, parentProcessId, userId, cpuUsage, memoryUsage, commandName, startTimeString, command}) => {
 	// Parse numeric fields with proper defaults
@@ -127,6 +160,11 @@ const parseProcessFields = ({processId, parentProcessId, userId, cpuUsage, memor
 
 	// Resolve executable path from command line
 	const resolvedExecutablePath = resolveExecutablePath(process.platform, parsedProcessId, command);
+	const extractedArguments = extractProcessArguments({
+		command,
+		executablePath: resolvedExecutablePath,
+		commandName,
+	});
 
 	// Derive process name: prefer basename of path, fallback to command name
 	const derivedProcessName = resolvedExecutablePath ? path.basename(resolvedExecutablePath) : (commandName || '');
@@ -139,6 +177,7 @@ const parseProcessFields = ({processId, parentProcessId, userId, cpuUsage, memor
 		memory: parsedMemoryUsagePercentage,
 		name: derivedProcessName,
 		path: resolvedExecutablePath,
+		args: extractedArguments,
 		startTime: makeStartTime(startTimeString),
 		cmd: command || '',
 	};
